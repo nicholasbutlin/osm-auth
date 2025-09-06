@@ -1,145 +1,100 @@
-# SCOUTING-ACCOUNTING
+# OSM Auth Module
 
-```
-                          __  _
-   ______________  __  __/ /_(_)___  ____ _      ____ _______________  __  __
-  / ___/ ___/ __ \/ / / / __/ / __ \/ __ `/_____/ __ `/ ___/ ___/ __ \/ / / /
- (__  ) /__/ /_/ / /_/ / /_/ / / / / /_/ /_____/ /_/ / /__/ /__/ /_/ / /_/ /
-/____/\___/\____/\__,_/\__/_/_/ /_/\__, /      \__,_/\___/\___/\____/\__,_/
-                                  /____/
-          __  _
-   ____  / /_(_)___  ____ _
-  / __ \/ __/ / __ \/ __ `/
- / / / / /_/ / / / / /_/ /
-/_/ /_/\__/_/_/ /_/\__, /
-                  /____/
-```
+Reusable OAuth 2.0 helper for Online Scout Manager (OSM). It wraps an `authlib` `OAuth2Client` and provides simple methods to start the Authorization Code flow and exchange a callback URL for tokens. Use it from web apps (FastAPI), CLI tools, or scripts.
 
-## Table of Contents
+Quick highlights:
+- `get_token(...)`: Reuse/refresh a stored token or run an interactive browser login and persist the result.
+- Web apps use `authorization_url()` and `fetch_token_from_callback(...)`; no local callback server needed.
 
-- [SCOUTING-ACCOUNTING](#scouting-accounting)
-  - [Table of Contents](#table-of-contents)
-  - [About The Project](#about-the-project)
-  - [System Overview](#system-overview)
-  - [Getting Started](#getting-started)
-    - [Prerequisites](#prerequisites)
-    - [Installation](#installation)
-  - [Usage](#usage)
-    - [Running the Application](#running-the-application)
-  - [Integrations](#integrations)
-    - [Xero](#xero)
-    - [GoCardless](#gocardless)
-    - [SumUp](#sumup)
-  - [Development](#development)
-    - [Version Control](#version-control)
-    - [Release](#release)
-  - [License](#license)
+## Configuration
 
-## About The Project
+Set environment variables (e.g., via `.env`) recognised by `OSMAuthConfig`:
 
-Scouting-Accounting is a tool designed to help scout groups manage their financial accounts by integrating with various payment platforms and accounting systems. The application facilitates the collection, processing, and reconciliation of financial transactions from multiple sources.
+- `OSM_CLIENT_ID`: Your OSM OAuth client ID
+- `OSM_CLIENT_SECRET`: Your OSM OAuth client secret
+- `OSM_REDIRECT_URI`: Redirect URI registered with OSM
+- `OSM_SCOPES` (optional): Defaults to `section:finance:read`
+- `BASE_URL` (optional): Defaults to `https://www.onlinescoutmanager.co.uk`
+- `OSM_BANK_ACCOUNT_ID` (optional): Kept for compatibility with the transactions integration
 
-## System Overview
+Example `.env` snippet:
 
-The application integrates with three main payment/accounting systems:
-
-- **Xero**: Accounting software integration
-- **GoCardless**: Direct debit payment platform
-- **SumUp**: Card payment processing service
-- **OSM**: Online Scout Manager
-- **Stripe**: Payment processing platform - PLANNED
-
-Data from these systems is fetched, normalized, and can be used for reporting and reconciliation purposes.
-
-## Getting Started
-
-To get a local copy up and running follow these simple steps.
-
-### Prerequisites
-
-In order to be able to install, run and develop with this application you need:
-
-1. Git - so the repo can be cloned
-2. Python >= 3.10
-3. [Pipenv](https://pipenv.pypa.io/en/latest/) for virtual environment and dependency management
-4. API credentials for the integrated services (Xero, GoCardless, SumUp)
-
-### Installation
-
-1. Clone the repo and cd into the top level directory
-2. Install the dependencies and dev dependencies with:
-   ```
-   pipenv install -d
-   ```
-3. Configure environment variables in `.env` file with your API credentials
-
-## Usage
-
-### Running the Application
-
-This project is CLI-only. Run all integrations and write CSVs + logs:
-
-```bash
-make cli
+```text
+OSM_CLIENT_ID=xxxx
+OSM_CLIENT_SECRET=yyyy
+OSM_REDIRECT_URI=https://localhost:8765/osm/callback
+OSM_SCOPES=section:finance:read
 ```
 
+## CLI/Desktop (Built‑in Callback Waiter)
 
-## Integrations
+```python
+from auth.osm import OSMClient
 
-### Xero
-
-The Xero integration uses OAuth2 authentication to access the accounting API. It allows:
-- Fetching bank transactions
-- Processing transaction data
-- Displaying transaction summaries for different accounts
-
-### GoCardless
-
-The GoCardless integration retrieves:
-- Direct debit payments
-- Payouts
-- Refunds
-
-It converts these into standardized transaction objects for further processing.
-
-### SumUp
-
-The SumUp integration fetches:
-- Card payments
-- Payouts
-- Transaction fees
-
-It converts these into standardized transaction objects for further processing.
-
-### OSM
-
-The OSM integration fetches:
-- Spend card transactions
-- Top up transactions
-
-It converts these into standardized transaction objects for further processing.
-
-## Development
-
-### Version Control
-
-We use [Semantic Commits](https://gist.github.com/joshbuchea/6f47e86d2510bce28f8e7f42ae84c716) for commit messages and follow [trunk based development](https://trunkbaseddevelopment.com).
-
-Example workflow:
-
-```bash
-git checkout main
-git pull
-git checkout -b feat/some-feature
-git add .
-git commit -m "feat: feature description"
-git push -u origin feat/some-feature
+client = OSMClient()
+# Reuse/refresh if possible; otherwise open the browser and wait locally
+token = client.get_token(timeout_seconds=180)
+print("Access token acquired.")
 ```
 
-### Release
+## Web (FastAPI) Pattern (Deprecated in this repo)
 
-[Semantic release](https://python-semantic-release.readthedocs.io/en/latest/) is used to manage the release process. Releases are automated and triggered by merges to the main branch.
+The project is now CLI-only. The following example remains for reference if you adapt the auth client in a web app.
 
-## License
+```python
+from fastapi import APIRouter, Request
+from auth.osm import OSMClient
 
-MIT License. See 'LICENSE' for more information.
+router = APIRouter()
+client = OSMClient()
+
+@router.get("/osm/login")
+def login():
+    return {"authorize_url": client.authorization_url()}
+
+@router.get("/osm/callback")
+def callback(request: Request):
+    token = client.fetch_token_from_callback(str(request.url))
+    # Persist token if desired, then proceed
+    # Can call any OSM API with client here, or reuse client in other routes
+    return {"ok": True}
+```
+
+## Persistence and Headless/CI
+
+OSM requires an interactive consent at least once. Tokens are persisted by default to `data/osm_token.json`.
+
+- First run (interactive, local):
+  - CLI: `auth.get_token()` opens a browser, waits for the redirect, exchanges and saves the token.
+  - Web: call `fetch_token_from_callback(...)` in your callback handler; it is saved automatically.
+
+- Later (headless/CI):
+  - Use `get_or_refresh_token()` to reuse or refresh without opening a browser:
+
+```python
+import os
+from auth.osm import OSMAuth
+
+# Point to a token saved during a prior interactive login
+os.environ["OSM_TOKEN_FILE"] = "/secure/path/osm_token.json"
+
+auth = OSMAuth()
+token = auth.get_or_refresh_token()
+if not token:
+    raise RuntimeError(
+        "No valid token available; perform one interactive login to seed the token store."
+    )
+```
+
+## OSM Reference Notes
+
+- For pure server-to-server automation, OSM does not provide service accounts; an initial interactive login is required.
+- Need to make sure scopes match your app's registered scopes.
+
+See `docs/osm_oauth_reference.md` for the full OSM OAuth 2.0 reference (endpoints, scopes, and guidance).
+
+## Local HTTPS Certificates
+
+OAuth redirects to `https://localhost`, you need local TLS certificates so the embedded callback server can listen over HTTPS.
+The code defaults to `certs/localhost.pem` and `certs/localhost-key.pem`.
+See `certs/readme.md` for details on how to generate these with `mkcert`.
