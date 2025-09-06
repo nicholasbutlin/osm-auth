@@ -1,0 +1,63 @@
+include:
+  - template: Security/SAST.gitlab-ci.yml
+
+stages:
+  - test
+  - build
+  - push
+  - deploy
+
+image: registry.gitlab.com/evenergi/secdevops/build-tools/pybuild3.10:latest
+
+build:
+  stage: build
+  script:
+    - pipenv check
+    - semantic-release publish --post
+    - python -m build --sdist --wheel .
+    - twine upload --verbose --user nickoszee -p $PYPI_PASSWORD dist/*
+  only:
+    - main
+
+docker_build:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  variables:
+    DOCKER_IMAGE_TAG: "latest"
+    TF_DIR: "terraform"
+    ENV_FILE: "terraform/env/dev.tfvars"
+  script:
+    - docker build -t "$CI_REGISTRY_IMAGE:$DOCKER_IMAGE_TAG" .
+  only:
+    - main
+
+docker_push:
+  stage: push
+  image: docker:latest
+  services:
+    - docker:dind
+  variables:
+    DOCKER_IMAGE_TAG: "latest"
+    TF_DIR: "terraform"
+    ENV_FILE: "terraform/env/dev.tfvars"
+  script:
+    - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
+    - docker tag "$CI_REGISTRY_IMAGE:$DOCKER_IMAGE_TAG" "$ECR_REPOSITORY_URL:$DOCKER_IMAGE_TAG"
+    - docker push "$ECR_REPOSITORY_URL:$DOCKER_IMAGE_TAG"
+  only:
+    - main
+
+tofu_deploy:
+  stage: deploy
+  image: opentofu/opentofu:latest
+  variables:
+    TF_DIR: "terraform"
+    ENV_FILE: "terraform/env/dev.tfvars"
+    TF_IN_AUTOMATION: "true"
+  script:
+    - tofu -chdir=$TF_DIR init
+    - tofu -chdir=$TF_DIR apply -var-file=$ENV_FILE -auto-approve
+  only:
+    - main

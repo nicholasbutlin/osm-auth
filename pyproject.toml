@@ -1,0 +1,61 @@
+[project]
+authors = [
+  {name = "Nicholas Butlin", email = "nicholasbutlin@gmail.com"},
+]
+description = "description"
+dynamic = ["version", "readme"]
+name = "osm-auth"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic",
+    "pydantic-settings",
+    "pyyaml",
+    "xero-python",
+    "httpx",
+    "python-dateutil",
+    "authlib",
+]
+
+[tool.setuptools.dynamic]
+readme = {file = "README.md"}
+version = {file = "VERSION"}
+
+[tool.black]
+
+[tool.isort]
+profile = "black"
+
+[tool.docformatter]
+black = true
+in-place = true
+recursive = true
+style = "google"
+
+[tool.semantic_release]
+assets = ["VERSION"]
+commit_message = "chore(release): {version} [skip ci]"
+remote.type = "gitlab"
+version_variables = [
+  "src/__init__.py:__version__",
+]
+
+[tool.pytest.ini_options]
+addopts = "-vv"
+log_file = "logs/pytest.log"
+log_file_level = "DEBUG"
+pythonpath = ["src", "test"]
+testpaths = ["test"]
+
+
+[dependency-groups]
+dev = [
+    "ipykernel",
+    "flake8",
+    "black",
+    "isort",
+    "docformatter",
+    "pre-commit",
+    "pytest",
+    "pytest-cov",
+    "pytest-xdist",
+]
