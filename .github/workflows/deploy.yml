@@ -6,7 +6,7 @@ on:
 
 jobs:
   release:
-    name: Semantic Release
+    name: Python Semantic Release
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -16,10 +16,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Run semantic-release
-        id: semantic
-        uses: cycjimmy/semantic-release-action@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          branches: main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          python-version: '3.11'
+
+      - name: Python Semantic Release
+        uses: python-semantic-release/python-semantic-release@v9
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}

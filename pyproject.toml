@@ -34,7 +34,7 @@ style = "google"
 [tool.semantic_release]
 assets = ["VERSION"]
 commit_message = "chore(release): {version} [skip ci]"
-remote.type = "gitlab"
+remote.type = "github"
 version_variables = [
   "src/__init__.py:__version__",
 ]
