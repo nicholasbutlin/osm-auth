@@ -62,7 +62,7 @@ def callback(request: Request):
 
 ## Persistence and Headless/CI
 
-OSM requires an interactive consent at least once. Tokens are persisted by default to `data/osm_token.json`.
+OSM requires an interactive consent at least once. Tokens are persisted by default to `data/auth_cache/osm_token.json`.
 
 - First run (interactive, local):
   - CLI: `auth.get_token()` opens a browser, waits for the redirect, exchanges and saves the token.
@@ -72,14 +72,14 @@ OSM requires an interactive consent at least once. Tokens are persisted by defau
   - Use `get_or_refresh_token()` to reuse or refresh without opening a browser:
 
 ```python
-import os
-from auth.osm import OSMAuth
+from auth.osm import OSMClient
+from auth.token_store import JsonTokenStore
 
-# Point to a token saved during a prior interactive login
-os.environ["OSM_TOKEN_FILE"] = "/secure/path/osm_token.json"
+# Optionally choose a custom token path (seed this once via interactive login)
+store = JsonTokenStore("/secure/path/osm_token.json")
 
-auth = OSMAuth()
-token = auth.get_or_refresh_token()
+client = OSMClient(token_store=store)
+token = client.get_or_refresh_token()
 if not token:
     raise RuntimeError(
         "No valid token available; perform one interactive login to seed the token store."
@@ -95,6 +95,7 @@ See `docs/osm_oauth_reference.md` for the full OSM OAuth 2.0 reference (endpoint
 
 ## Local HTTPS Certificates
 
-OAuth redirects to `https://localhost`, you need local TLS certificates so the embedded callback server can listen over HTTPS.
-The code defaults to `certs/localhost.pem` and `certs/localhost-key.pem`.
-See `certs/readme.md` for details on how to generate these with `mkcert`.
+If your `OSM_REDIRECT_URI` uses `https` (e.g. `https://localhost:8765/osm/callback`), the embedded callback server requires local TLS certificates.
+By default the code looks for `certs/localhost.pem` and `certs/localhost-key.pem` at the repo root.
+
+See `docs/local_certs.md` for instructions to generate dev certificates with mkcert and place them in the `certs/` directory.
